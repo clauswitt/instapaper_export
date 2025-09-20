@@ -1,0 +1,13 @@
+# Private data files
+input/*
+**/*.sqlite
+test_export/
+
+# Build artifacts
+instapaper-cli
+*.exe
+
+# OS files
+.DS_Store
+Thumbs.db
+
