@@ -8,6 +8,7 @@ A full-featured Go CLI application that transforms Instapaper CSV exports into a
 - **Fetch**: Download article content using readability extraction
 - **Search**: Full-text and LIKE search across titles, URLs, content, folders, and tags
 - **Export**: Generate Markdown files with YAML frontmatter for knowledge management
+- **MCP Server**: Model Context Protocol server for AI integration (Claude, etc.)
 - **Manage**: Utilities for folders, tags, and database maintenance
 
 ## Installation
@@ -38,6 +39,9 @@ instapaper-cli search "kubernetes"
 
 # 4. Export to markdown files
 instapaper-cli export-all --dir ~/knowledge-base
+
+# 5. Start MCP server for AI integration
+instapaper-cli mcp
 ```
 
 ## Commands
@@ -87,6 +91,35 @@ instapaper-cli export-all --dir ~/knowledge-base
 
 # Preserve folder structure
 instapaper-cli export-all --dir ~/kb --preserve-folders
+```
+
+### MCP Server
+Start Model Context Protocol server for AI integration:
+```bash
+# Start MCP server (listens on stdio)
+instapaper-cli mcp
+
+# Start with specific database
+instapaper-cli mcp --db /path/to/instapaper.sqlite
+```
+
+**Available MCP Tools:**
+- `search_articles` - Search with filters, full-text search, date ranges
+- `get_article` - Get single article with full content by ID
+- `list_folders` - Browse available folders with article counts
+- `list_tags` - Browse available tags with article counts
+- `export_articles` - Export filtered articles to markdown for AI consumption
+
+**Claude Desktop Integration:**
+```json
+{
+  "mcpServers": {
+    "instapaper": {
+      "command": "/path/to/instapaper-cli",
+      "args": ["mcp", "--db", "/path/to/instapaper.sqlite"]
+    }
+  }
+}
 ```
 
 ### Management

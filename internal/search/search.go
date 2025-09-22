@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"text/tabwriter"
 
 	"instapaper-cli/internal/db"
@@ -72,31 +73,35 @@ func (s *Search) searchLike(opts SearchOptions) ([]model.SearchResult, error) {
 	var whereClause string
 	var args []interface{}
 
+	// Always exclude obsolete articles
+	var conditions []string
+	conditions = append(conditions, "a.obsolete = FALSE")
+
 	if opts.Field != "" && opts.Query != "" {
 		switch opts.Field {
 		case "url":
-			whereClause = "WHERE a.url LIKE ?"
+			conditions = append(conditions, "a.url LIKE ?")
 		case "title":
-			whereClause = "WHERE a.title LIKE ?"
+			conditions = append(conditions, "a.title LIKE ?")
 		case "content":
-			whereClause = "WHERE a.content_md LIKE ?"
+			conditions = append(conditions, "a.content_md LIKE ?")
 		case "tags":
-			whereClause = "WHERE t.title LIKE ?"
+			conditions = append(conditions, "t.title LIKE ?")
 		case "folder":
-			whereClause = "WHERE f.path_cache LIKE ? OR f.title LIKE ?"
+			conditions = append(conditions, "(f.path_cache LIKE ? OR f.title LIKE ?)")
 			args = append(args, "%"+opts.Query+"%")
 		default:
 			return nil, fmt.Errorf("invalid field: %s", opts.Field)
 		}
 		args = append(args, "%"+opts.Query+"%")
 	} else if opts.Query != "" {
-		whereClause = `
-			WHERE (a.url LIKE ? OR a.title LIKE ? OR a.content_md LIKE ?
-			       OR t.title LIKE ? OR f.path_cache LIKE ?)
-		`
+		conditions = append(conditions, `(a.url LIKE ? OR a.title LIKE ? OR a.content_md LIKE ?
+		       OR t.title LIKE ? OR f.path_cache LIKE ?)`)
 		pattern := "%" + opts.Query + "%"
 		args = append(args, pattern, pattern, pattern, pattern, pattern)
 	}
+
+	whereClause = "WHERE " + strings.Join(conditions, " AND ")
 
 	query := baseQuery + " " + whereClause + `
 		GROUP BY a.id
@@ -142,30 +147,36 @@ func (s *Search) searchFTS(opts SearchOptions) ([]model.SearchResult, error) {
 	var whereClause string
 	var args []interface{}
 
+	// Always exclude obsolete articles
+	var conditions []string
+	conditions = append(conditions, "a.obsolete = FALSE")
+
 	if opts.Field != "" {
 		switch opts.Field {
 		case "url":
-			whereClause = "WHERE articles_fts MATCH ?"
+			conditions = append(conditions, "articles_fts MATCH ?")
 			args = append(args, "url: "+opts.Query)
 		case "title":
-			whereClause = "WHERE articles_fts MATCH ?"
+			conditions = append(conditions, "articles_fts MATCH ?")
 			args = append(args, "title: "+opts.Query)
 		case "content":
-			whereClause = "WHERE articles_fts MATCH ?"
+			conditions = append(conditions, "articles_fts MATCH ?")
 			args = append(args, "content: "+opts.Query)
 		case "tags":
-			whereClause = "WHERE articles_fts MATCH ?"
+			conditions = append(conditions, "articles_fts MATCH ?")
 			args = append(args, "tags: "+opts.Query)
 		case "folder":
-			whereClause = "WHERE articles_fts MATCH ?"
+			conditions = append(conditions, "articles_fts MATCH ?")
 			args = append(args, "folder: "+opts.Query)
 		default:
 			return nil, fmt.Errorf("invalid field for FTS: %s", opts.Field)
 		}
 	} else {
-		whereClause = "WHERE articles_fts MATCH ?"
+		conditions = append(conditions, "articles_fts MATCH ?")
 		args = append(args, opts.Query)
 	}
+
+	whereClause = "WHERE " + strings.Join(conditions, " AND ")
 
 	query := baseQuery + " " + whereClause + `
 		GROUP BY a.id

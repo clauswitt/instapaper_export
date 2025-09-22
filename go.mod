@@ -1,6 +1,6 @@
 module instapaper-cli
 
-go 1.23.0
+go 1.23.2
 
 toolchain go1.24.0
 
@@ -9,6 +9,7 @@ require (
 	github.com/go-shiori/go-readability v0.0.0-20250217085726-9f5bf5ca7612
 	github.com/gosimple/slug v1.15.0
 	github.com/jmoiron/sqlx v1.4.0
+	github.com/mark3labs/mcp-go v0.7.0
 	github.com/spf13/cobra v1.10.1
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.39.0

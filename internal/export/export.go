@@ -97,7 +97,7 @@ func (e *Export) getArticleWithDetails(id int64) (*model.ArticleWithDetails, err
 			f.path_cache as folder_path
 		FROM articles a
 		LEFT JOIN folders f ON a.folder_id = f.id
-		WHERE a.id = ?
+		WHERE a.id = ? AND a.obsolete = FALSE
 	`
 
 	var article model.ArticleWithDetails
@@ -146,7 +146,7 @@ func (e *Export) getArticlesForExport(opts ExportAllOptions) ([]model.ArticleWit
 		LEFT JOIN folders f ON a.folder_id = f.id
 		LEFT JOIN article_tags at ON a.id = at.article_id
 		LEFT JOIN tags t ON at.tag_id = t.id
-		WHERE 1=1
+		WHERE a.obsolete = FALSE
 	`
 
 	var args []interface{}
@@ -204,6 +204,7 @@ func (e *Export) getArticlesFromSearch(opts ExportAllOptions) ([]model.ArticleWi
 		LEFT JOIN folders f ON a.folder_id = f.id
 		LEFT JOIN article_tags at ON a.id = at.article_id
 		LEFT JOIN tags t ON at.tag_id = t.id
+		WHERE a.obsolete = FALSE
 	`
 
 	var whereClause string
@@ -221,45 +222,46 @@ func (e *Export) getArticlesFromSearch(opts ExportAllOptions) ([]model.ArticleWi
 			LEFT JOIN article_tags at ON a.id = at.article_id
 			LEFT JOIN tags t ON at.tag_id = t.id
 			INNER JOIN articles_fts fts ON a.id = fts.rowid
+			WHERE a.obsolete = FALSE
 		`
 
 		if opts.SearchField != "" {
 			switch opts.SearchField {
 			case "url":
-				whereClause = "WHERE articles_fts MATCH ?"
+				whereClause = "AND articles_fts MATCH ?"
 				args = append(args, "url: "+opts.FromSearch)
 			case "title":
-				whereClause = "WHERE articles_fts MATCH ?"
+				whereClause = "AND articles_fts MATCH ?"
 				args = append(args, "title: "+opts.FromSearch)
 			case "content":
-				whereClause = "WHERE articles_fts MATCH ?"
+				whereClause = "AND articles_fts MATCH ?"
 				args = append(args, "content: "+opts.FromSearch)
 			case "tags":
-				whereClause = "WHERE articles_fts MATCH ?"
+				whereClause = "AND articles_fts MATCH ?"
 				args = append(args, "tags: "+opts.FromSearch)
 			case "folder":
-				whereClause = "WHERE articles_fts MATCH ?"
+				whereClause = "AND articles_fts MATCH ?"
 				args = append(args, "folder: "+opts.FromSearch)
 			default:
 				return nil, fmt.Errorf("invalid field for FTS: %s", opts.SearchField)
 			}
 		} else {
-			whereClause = "WHERE articles_fts MATCH ?"
+			whereClause = "AND articles_fts MATCH ?"
 			args = append(args, opts.FromSearch)
 		}
 	} else {
 		if opts.SearchField != "" {
 			switch opts.SearchField {
 			case "url":
-				whereClause = "WHERE a.url LIKE ?"
+				whereClause = "AND a.url LIKE ?"
 			case "title":
-				whereClause = "WHERE a.title LIKE ?"
+				whereClause = "AND a.title LIKE ?"
 			case "content":
-				whereClause = "WHERE a.content_md LIKE ?"
+				whereClause = "AND a.content_md LIKE ?"
 			case "tags":
-				whereClause = "WHERE t.title LIKE ?"
+				whereClause = "AND t.title LIKE ?"
 			case "folder":
-				whereClause = "WHERE f.path_cache LIKE ? OR f.title LIKE ?"
+				whereClause = "AND (f.path_cache LIKE ? OR f.title LIKE ?)"
 				args = append(args, "%"+opts.FromSearch+"%")
 			default:
 				return nil, fmt.Errorf("invalid field: %s", opts.SearchField)
@@ -267,7 +269,7 @@ func (e *Export) getArticlesFromSearch(opts ExportAllOptions) ([]model.ArticleWi
 			args = append(args, "%"+opts.FromSearch+"%")
 		} else {
 			whereClause = `
-				WHERE (a.url LIKE ? OR a.title LIKE ? OR a.content_md LIKE ?
+				AND (a.url LIKE ? OR a.title LIKE ? OR a.content_md LIKE ?
 				       OR t.title LIKE ? OR f.path_cache LIKE ?)
 			`
 			pattern := "%" + opts.FromSearch + "%"

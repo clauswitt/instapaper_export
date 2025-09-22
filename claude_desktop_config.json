@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "instapaper": {
+      "command": "/Users/clauswitt/Documents/Projects/Personal/instapaper_export/instapaper-cli",
+      "args": [
+        "mcp",
+        "--db", "/Users/clauswitt/Documents/Projects/Personal/instapaper_export/instapaper.sqlite",
+        "--migrations", "/Users/clauswitt/Documents/Projects/Personal/instapaper_export/migrations"
+      ]
+    }
+  }
+}
