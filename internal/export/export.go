@@ -26,6 +26,10 @@ type ExportAllOptions struct {
 	TagFilter       string
 	Since           string
 	Until           string
+	FromSearch      string
+	SearchField     string
+	SearchFTS       bool
+	SearchLimit     int
 }
 
 func New(database *db.DB) *Export {
@@ -128,6 +132,10 @@ func (e *Export) getArticleTags(articleID int64) ([]string, error) {
 }
 
 func (e *Export) getArticlesForExport(opts ExportAllOptions) ([]model.ArticleWithDetails, error) {
+	if opts.FromSearch != "" {
+		return e.getArticlesFromSearch(opts)
+	}
+
 	query := `
 		SELECT DISTINCT
 			a.id, a.url, a.title, a.selection, a.folder_id, a.instapapered_at,
@@ -168,6 +176,119 @@ func (e *Export) getArticlesForExport(opts ExportAllOptions) ([]model.ArticleWit
 	}
 
 	query += " ORDER BY a.instapapered_at DESC"
+
+	var articles []model.ArticleWithDetails
+	if err := e.db.Select(&articles, query, args...); err != nil {
+		return nil, err
+	}
+
+	for i := range articles {
+		tags, err := e.getArticleTags(articles[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		articles[i].Tags = tags
+	}
+
+	return articles, nil
+}
+
+func (e *Export) getArticlesFromSearch(opts ExportAllOptions) ([]model.ArticleWithDetails, error) {
+	baseQuery := `
+		SELECT
+			a.id, a.url, a.title, a.selection, a.folder_id, a.instapapered_at,
+			a.synced_at, a.sync_failed_at, a.failed_count, a.status_code,
+			a.status_text, a.final_url, a.content_md, a.raw_html,
+			f.path_cache as folder_path
+		FROM articles a
+		LEFT JOIN folders f ON a.folder_id = f.id
+		LEFT JOIN article_tags at ON a.id = at.article_id
+		LEFT JOIN tags t ON at.tag_id = t.id
+	`
+
+	var whereClause string
+	var args []interface{}
+
+	if opts.SearchFTS {
+		baseQuery = `
+			SELECT
+				a.id, a.url, a.title, a.selection, a.folder_id, a.instapapered_at,
+				a.synced_at, a.sync_failed_at, a.failed_count, a.status_code,
+				a.status_text, a.final_url, a.content_md, a.raw_html,
+				f.path_cache as folder_path
+			FROM articles a
+			LEFT JOIN folders f ON a.folder_id = f.id
+			LEFT JOIN article_tags at ON a.id = at.article_id
+			LEFT JOIN tags t ON at.tag_id = t.id
+			INNER JOIN articles_fts fts ON a.id = fts.rowid
+		`
+
+		if opts.SearchField != "" {
+			switch opts.SearchField {
+			case "url":
+				whereClause = "WHERE articles_fts MATCH ?"
+				args = append(args, "url: "+opts.FromSearch)
+			case "title":
+				whereClause = "WHERE articles_fts MATCH ?"
+				args = append(args, "title: "+opts.FromSearch)
+			case "content":
+				whereClause = "WHERE articles_fts MATCH ?"
+				args = append(args, "content: "+opts.FromSearch)
+			case "tags":
+				whereClause = "WHERE articles_fts MATCH ?"
+				args = append(args, "tags: "+opts.FromSearch)
+			case "folder":
+				whereClause = "WHERE articles_fts MATCH ?"
+				args = append(args, "folder: "+opts.FromSearch)
+			default:
+				return nil, fmt.Errorf("invalid field for FTS: %s", opts.SearchField)
+			}
+		} else {
+			whereClause = "WHERE articles_fts MATCH ?"
+			args = append(args, opts.FromSearch)
+		}
+	} else {
+		if opts.SearchField != "" {
+			switch opts.SearchField {
+			case "url":
+				whereClause = "WHERE a.url LIKE ?"
+			case "title":
+				whereClause = "WHERE a.title LIKE ?"
+			case "content":
+				whereClause = "WHERE a.content_md LIKE ?"
+			case "tags":
+				whereClause = "WHERE t.title LIKE ?"
+			case "folder":
+				whereClause = "WHERE f.path_cache LIKE ? OR f.title LIKE ?"
+				args = append(args, "%"+opts.FromSearch+"%")
+			default:
+				return nil, fmt.Errorf("invalid field: %s", opts.SearchField)
+			}
+			args = append(args, "%"+opts.FromSearch+"%")
+		} else {
+			whereClause = `
+				WHERE (a.url LIKE ? OR a.title LIKE ? OR a.content_md LIKE ?
+				       OR t.title LIKE ? OR f.path_cache LIKE ?)
+			`
+			pattern := "%" + opts.FromSearch + "%"
+			args = append(args, pattern, pattern, pattern, pattern, pattern)
+		}
+	}
+
+	query := baseQuery + " " + whereClause + `
+		GROUP BY a.id
+	`
+
+	if opts.SearchFTS {
+		query += " ORDER BY rank"
+	} else {
+		query += " ORDER BY a.instapapered_at DESC"
+	}
+
+	if opts.SearchLimit > 0 {
+		query += " LIMIT ?"
+		args = append(args, opts.SearchLimit)
+	}
 
 	var articles []model.ArticleWithDetails
 	if err := e.db.Select(&articles, query, args...); err != nil {

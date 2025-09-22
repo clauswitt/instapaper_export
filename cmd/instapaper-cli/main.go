@@ -137,6 +137,10 @@ func main() {
 		exportAllTag           string
 		exportAllSince         string
 		exportAllUntil         string
+		exportAllFromSearch    string
+		exportAllSearchField   string
+		exportAllSearchFTS     bool
+		exportAllSearchLimit   int
 	)
 
 	exportAllCmd.Flags().StringVar(&exportAllDir, "dir", "", "Output directory (required)")
@@ -146,6 +150,10 @@ func main() {
 	exportAllCmd.Flags().StringVar(&exportAllTag, "tag", "", "Filter by tag")
 	exportAllCmd.Flags().StringVar(&exportAllSince, "since", "", "Filter articles since date (ISO8601)")
 	exportAllCmd.Flags().StringVar(&exportAllUntil, "until", "", "Filter articles until date (ISO8601)")
+	exportAllCmd.Flags().StringVar(&exportAllFromSearch, "from-search", "", "Export articles from search results")
+	exportAllCmd.Flags().StringVar(&exportAllSearchField, "field", "", "Search specific field: url, title, content, tags, folder")
+	exportAllCmd.Flags().BoolVar(&exportAllSearchFTS, "fts", false, "Use full-text search")
+	exportAllCmd.Flags().IntVar(&exportAllSearchLimit, "limit", 0, "Maximum number of search results to export")
 	exportAllCmd.MarkFlagRequired("dir")
 
 	var foldersCmd = &cobra.Command{
@@ -284,6 +292,10 @@ func runExportAll(cmd *cobra.Command, args []string) error {
 	tag, _ := cmd.Flags().GetString("tag")
 	since, _ := cmd.Flags().GetString("since")
 	until, _ := cmd.Flags().GetString("until")
+	fromSearch, _ := cmd.Flags().GetString("from-search")
+	searchField, _ := cmd.Flags().GetString("field")
+	searchFTS, _ := cmd.Flags().GetBool("fts")
+	searchLimit, _ := cmd.Flags().GetInt("limit")
 
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
@@ -297,6 +309,10 @@ func runExportAll(cmd *cobra.Command, args []string) error {
 		TagFilter:       tag,
 		Since:           since,
 		Until:           until,
+		FromSearch:      fromSearch,
+		SearchField:     searchField,
+		SearchFTS:       searchFTS,
+		SearchLimit:     searchLimit,
 	}
 
 	e := export.New(database)

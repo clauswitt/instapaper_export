@@ -145,19 +145,23 @@ func (s *Search) searchFTS(opts SearchOptions) ([]model.SearchResult, error) {
 	if opts.Field != "" {
 		switch opts.Field {
 		case "url":
-			whereClause = "WHERE articles_fts.url MATCH ?"
+			whereClause = "WHERE articles_fts MATCH ?"
+			args = append(args, "url: "+opts.Query)
 		case "title":
-			whereClause = "WHERE articles_fts.title MATCH ?"
+			whereClause = "WHERE articles_fts MATCH ?"
+			args = append(args, "title: "+opts.Query)
 		case "content":
-			whereClause = "WHERE articles_fts.content MATCH ?"
+			whereClause = "WHERE articles_fts MATCH ?"
+			args = append(args, "content: "+opts.Query)
 		case "tags":
-			whereClause = "WHERE articles_fts.tags MATCH ?"
+			whereClause = "WHERE articles_fts MATCH ?"
+			args = append(args, "tags: "+opts.Query)
 		case "folder":
-			whereClause = "WHERE articles_fts.folder MATCH ?"
+			whereClause = "WHERE articles_fts MATCH ?"
+			args = append(args, "folder: "+opts.Query)
 		default:
 			return nil, fmt.Errorf("invalid field for FTS: %s", opts.Field)
 		}
-		args = append(args, opts.Query)
 	} else {
 		whereClause = "WHERE articles_fts MATCH ?"
 		args = append(args, opts.Query)
