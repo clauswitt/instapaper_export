@@ -105,23 +105,23 @@ func (s *Search) searchLike(opts SearchOptions) ([]model.SearchResult, error) {
 	if opts.Field != "" && opts.Query != "" {
 		switch opts.Field {
 		case "url":
-			conditions = append(conditions, "a.url LIKE ?")
+			conditions = append(conditions, "a.url LIKE ? COLLATE NOCASE")
 		case "title":
-			conditions = append(conditions, "a.title LIKE ?")
+			conditions = append(conditions, "a.title LIKE ? COLLATE NOCASE")
 		case "content":
-			conditions = append(conditions, "a.content_md LIKE ?")
+			conditions = append(conditions, "a.content_md LIKE ? COLLATE NOCASE")
 		case "tags":
-			conditions = append(conditions, "t.title LIKE ?")
+			conditions = append(conditions, "t.title LIKE ? COLLATE NOCASE")
 		case "folder":
-			conditions = append(conditions, "(f.path_cache LIKE ? OR f.title LIKE ?)")
+			conditions = append(conditions, "(f.path_cache LIKE ? COLLATE NOCASE OR f.title LIKE ? COLLATE NOCASE)")
 			args = append(args, "%"+opts.Query+"%")
 		default:
 			return nil, fmt.Errorf("invalid field: %s", opts.Field)
 		}
 		args = append(args, "%"+opts.Query+"%")
 	} else if opts.Query != "" {
-		conditions = append(conditions, `(a.url LIKE ? OR a.title LIKE ? OR a.content_md LIKE ?
-		       OR t.title LIKE ? OR f.path_cache LIKE ?)`)
+		conditions = append(conditions, `(a.url LIKE ? COLLATE NOCASE OR a.title LIKE ? COLLATE NOCASE OR a.content_md LIKE ? COLLATE NOCASE
+		       OR t.title LIKE ? COLLATE NOCASE OR f.path_cache LIKE ? COLLATE NOCASE)`)
 		pattern := "%" + opts.Query + "%"
 		args = append(args, pattern, pattern, pattern, pattern, pattern)
 	}

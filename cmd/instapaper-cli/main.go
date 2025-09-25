@@ -616,8 +616,10 @@ func runDatabaseDoctor() error {
 	}
 
 	fmt.Println("\nRebuilding FTS index...")
-	if _, err := database.Exec("INSERT INTO articles_fts(articles_fts) VALUES('rebuild')"); err != nil {
+	if err := database.RebuildFTS(); err != nil {
 		fmt.Printf("Warning: FTS rebuild failed: %v\n", err)
+	} else {
+		fmt.Println("FTS index rebuilt successfully!")
 	}
 
 	var duplicateURLs []struct {

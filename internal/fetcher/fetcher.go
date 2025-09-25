@@ -175,6 +175,11 @@ func (f *Fetcher) fetchSingleArticle(article model.Article, opts FetchOptions) e
 		return fmt.Errorf("failed to update article: %w", err)
 	}
 
+	// Update FTS table
+	if err := f.db.UpsertArticleFTS(article.ID); err != nil {
+		f.logger.Printf("Warning: failed to update FTS for article %d: %v", article.ID, err)
+	}
+
 	f.logger.Printf("Successfully fetched article %d: %s", article.ID, article.Title)
 	return nil
 }

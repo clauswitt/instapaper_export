@@ -249,3 +249,109 @@ func (db *DB) UpdateFolderPaths() error {
 
 	return nil
 }
+
+// UpsertArticleFTS updates the FTS table entry for an article
+func (db *DB) UpsertArticleFTS(articleID int64) error {
+	// Get article data including tags and folder
+	query := `
+		SELECT
+			a.id, a.url, a.title, a.content_md,
+			f.path_cache as folder_path,
+			GROUP_CONCAT(t.title, ', ') as tags
+		FROM articles a
+		LEFT JOIN folders f ON a.folder_id = f.id
+		LEFT JOIN article_tags at ON a.id = at.article_id
+		LEFT JOIN tags t ON at.tag_id = t.id
+		WHERE a.id = ?
+		GROUP BY a.id
+	`
+
+	var article struct {
+		ID         int64   `db:"id"`
+		URL        string  `db:"url"`
+		Title      string  `db:"title"`
+		ContentMD  *string `db:"content_md"`
+		FolderPath *string `db:"folder_path"`
+		Tags       *string `db:"tags"`
+	}
+
+	if err := db.Get(&article, query, articleID); err != nil {
+		return fmt.Errorf("failed to get article data: %w", err)
+	}
+
+	// Prepare FTS values
+	content := ""
+	if article.ContentMD != nil {
+		content = *article.ContentMD
+	}
+
+	folder := ""
+	if article.FolderPath != nil {
+		folder = *article.FolderPath
+	}
+
+	tags := ""
+	if article.Tags != nil {
+		tags = *article.Tags
+	}
+
+	// Insert or replace in FTS table
+	_, err := db.Exec(`
+		INSERT OR REPLACE INTO articles_fts (rowid, url, title, content, folder, tags)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`, articleID, article.URL, article.Title, content, folder, tags)
+
+	if err != nil {
+		return fmt.Errorf("failed to update FTS table: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteArticleFTS removes an article from the FTS table
+func (db *DB) DeleteArticleFTS(articleID int64) error {
+	_, err := db.Exec("DELETE FROM articles_fts WHERE rowid = ?", articleID)
+	if err != nil {
+		return fmt.Errorf("failed to delete from FTS table: %w", err)
+	}
+	return nil
+}
+
+// RebuildFTS rebuilds the entire FTS table from scratch
+func (db *DB) RebuildFTS() error {
+	// For contentless FTS tables, we need to drop and recreate instead of DELETE
+	// First, drop the existing FTS table
+	if _, err := db.Exec("DROP TABLE IF EXISTS articles_fts"); err != nil {
+		return fmt.Errorf("failed to drop FTS table: %w", err)
+	}
+
+	// Recreate the FTS table
+	if _, err := db.Exec(`CREATE VIRTUAL TABLE articles_fts USING fts5(
+		url, title, content, folder, tags, content=''
+	)`); err != nil {
+		return fmt.Errorf("failed to recreate FTS table: %w", err)
+	}
+
+	// Get all article IDs
+	var articleIDs []int64
+	if err := db.Select(&articleIDs, "SELECT id FROM articles WHERE obsolete = FALSE ORDER BY id"); err != nil {
+		return fmt.Errorf("failed to get article IDs: %w", err)
+	}
+
+	fmt.Printf("Rebuilding FTS for %d articles...\n", len(articleIDs))
+
+	// Rebuild FTS entries for all articles
+	for i, articleID := range articleIDs {
+		if err := db.UpsertArticleFTS(articleID); err != nil {
+			return fmt.Errorf("failed to rebuild FTS for article %d: %w", articleID, err)
+		}
+
+		// Print progress every 1000 articles
+		if (i+1)%1000 == 0 {
+			fmt.Printf("Rebuilt FTS for %d/%d articles...\n", i+1, len(articleIDs))
+		}
+	}
+
+	fmt.Printf("Successfully rebuilt FTS for %d articles.\n", len(articleIDs))
+	return nil
+}

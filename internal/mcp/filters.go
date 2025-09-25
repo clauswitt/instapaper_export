@@ -145,15 +145,15 @@ func (s *Server) searchLike(opts search.SearchOptions) ([]model.SearchResult, er
 	if opts.Field != "" && opts.Query != "" {
 		switch opts.Field {
 		case "url":
-			whereClause = "AND a.url LIKE ?"
+			whereClause = "AND a.url LIKE ? COLLATE NOCASE"
 		case "title":
-			whereClause = "AND a.title LIKE ?"
+			whereClause = "AND a.title LIKE ? COLLATE NOCASE"
 		case "content":
-			whereClause = "AND a.content_md LIKE ?"
+			whereClause = "AND a.content_md LIKE ? COLLATE NOCASE"
 		case "tags":
-			whereClause = "AND t.title LIKE ?"
+			whereClause = "AND t.title LIKE ? COLLATE NOCASE"
 		case "folder":
-			whereClause = "AND (f.path_cache LIKE ? OR f.title LIKE ?)"
+			whereClause = "AND (f.path_cache LIKE ? COLLATE NOCASE OR f.title LIKE ? COLLATE NOCASE)"
 			args = append(args, "%"+opts.Query+"%")
 		default:
 			return nil, fmt.Errorf("invalid field: %s", opts.Field)
@@ -161,8 +161,8 @@ func (s *Server) searchLike(opts search.SearchOptions) ([]model.SearchResult, er
 		args = append(args, "%"+opts.Query+"%")
 	} else if opts.Query != "" {
 		whereClause = `
-			AND (a.url LIKE ? OR a.title LIKE ? OR a.content_md LIKE ?
-			       OR t.title LIKE ? OR f.path_cache LIKE ?)
+			AND (a.url LIKE ? COLLATE NOCASE OR a.title LIKE ? COLLATE NOCASE OR a.content_md LIKE ? COLLATE NOCASE
+			       OR t.title LIKE ? COLLATE NOCASE OR f.path_cache LIKE ? COLLATE NOCASE)
 		`
 		pattern := "%" + opts.Query + "%"
 		args = append(args, pattern, pattern, pattern, pattern, pattern)
@@ -325,24 +325,24 @@ func (s *Server) performAdvancedSearch(req AdvancedSearchRequest) ([]model.Searc
 				args = append(args, req.Query)
 			}
 		} else {
-			conditions = append(conditions, "(a.url LIKE ? OR a.title LIKE ? OR a.content_md LIKE ? OR t.title LIKE ? OR f.path_cache LIKE ?)")
+			conditions = append(conditions, "(a.url LIKE ? COLLATE NOCASE OR a.title LIKE ? COLLATE NOCASE OR a.content_md LIKE ? COLLATE NOCASE OR t.title LIKE ? COLLATE NOCASE OR f.path_cache LIKE ? COLLATE NOCASE)")
 			pattern := "%" + req.Query + "%"
 			args = append(args, pattern, pattern, pattern, pattern, pattern)
 		}
 	}
 
 	if req.TitleContains != "" {
-		conditions = append(conditions, "a.title LIKE ?")
+		conditions = append(conditions, "a.title LIKE ? COLLATE NOCASE")
 		args = append(args, "%"+req.TitleContains+"%")
 	}
 
 	if req.ContentContains != "" {
-		conditions = append(conditions, "a.content_md LIKE ?")
+		conditions = append(conditions, "a.content_md LIKE ? COLLATE NOCASE")
 		args = append(args, "%"+req.ContentContains+"%")
 	}
 
 	if req.URLContains != "" {
-		conditions = append(conditions, "a.url LIKE ?")
+		conditions = append(conditions, "a.url LIKE ? COLLATE NOCASE")
 		args = append(args, "%"+req.URLContains+"%")
 	}
 
@@ -515,7 +515,7 @@ func (s *Server) findRelatedArticles(article model.ArticleWithDetails, relations
 		// Build LIKE conditions for content similarity
 		conditions := make([]string, len(words))
 		for i, word := range words {
-			conditions[i] = "a.content_md LIKE ?"
+			conditions[i] = "a.content_md LIKE ? COLLATE NOCASE"
 			args = append(args, "%"+word+"%")
 		}
 
@@ -704,12 +704,12 @@ func (s *Server) getArticlesForExport(opts export.ExportAllOptions) ([]model.Art
 	}
 
 	if opts.FolderFilter != "" {
-		query += " AND (f.path_cache = ? OR f.title = ?)"
+		query += " AND (f.path_cache = ? COLLATE NOCASE OR f.title = ? COLLATE NOCASE)"
 		args = append(args, opts.FolderFilter, opts.FolderFilter)
 	}
 
 	if opts.TagFilter != "" {
-		query += " AND t.title = ?"
+		query += " AND t.title = ? COLLATE NOCASE"
 		args = append(args, opts.TagFilter)
 	}
 
@@ -809,15 +809,15 @@ func (s *Server) getArticlesFromSearch(opts export.ExportAllOptions) ([]model.Ar
 		if opts.SearchField != "" {
 			switch opts.SearchField {
 			case "url":
-				whereClause = "WHERE a.url LIKE ?"
+				whereClause = "WHERE a.url LIKE ? COLLATE NOCASE"
 			case "title":
-				whereClause = "WHERE a.title LIKE ?"
+				whereClause = "WHERE a.title LIKE ? COLLATE NOCASE"
 			case "content":
-				whereClause = "WHERE a.content_md LIKE ?"
+				whereClause = "WHERE a.content_md LIKE ? COLLATE NOCASE"
 			case "tags":
-				whereClause = "WHERE t.title LIKE ?"
+				whereClause = "WHERE t.title LIKE ? COLLATE NOCASE"
 			case "folder":
-				whereClause = "WHERE f.path_cache LIKE ? OR f.title LIKE ?"
+				whereClause = "WHERE f.path_cache LIKE ? COLLATE NOCASE OR f.title LIKE ? COLLATE NOCASE"
 				args = append(args, "%"+opts.FromSearch+"%")
 			default:
 				return nil, fmt.Errorf("invalid field: %s", opts.SearchField)
@@ -825,8 +825,8 @@ func (s *Server) getArticlesFromSearch(opts export.ExportAllOptions) ([]model.Ar
 			args = append(args, "%"+opts.FromSearch+"%")
 		} else {
 			whereClause = `
-				WHERE (a.url LIKE ? OR a.title LIKE ? OR a.content_md LIKE ?
-				       OR t.title LIKE ? OR f.path_cache LIKE ?)
+				WHERE (a.url LIKE ? COLLATE NOCASE OR a.title LIKE ? COLLATE NOCASE OR a.content_md LIKE ? COLLATE NOCASE
+				       OR t.title LIKE ? COLLATE NOCASE OR f.path_cache LIKE ? COLLATE NOCASE)
 			`
 			pattern := "%" + opts.FromSearch + "%"
 			args = append(args, pattern, pattern, pattern, pattern, pattern)

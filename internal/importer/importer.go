@@ -147,6 +147,11 @@ func (i *Importer) processRecord(record model.CSVRecord) error {
 		if err := i.processTags(articleID, record.Tags); err != nil {
 			return fmt.Errorf("failed to process tags: %w", err)
 		}
+
+		// Update FTS table for new article
+		if err := i.db.UpsertArticleFTS(articleID); err != nil {
+			log.Printf("Warning: failed to update FTS for new article %d: %v", articleID, err)
+		}
 	} else if err != nil {
 		return fmt.Errorf("failed to check existing article: %w", err)
 	} else {
@@ -165,6 +170,11 @@ func (i *Importer) processRecord(record model.CSVRecord) error {
 
 		if err := i.processTags(existingID, record.Tags); err != nil {
 			return fmt.Errorf("failed to process tags: %w", err)
+		}
+
+		// Update FTS table for updated article
+		if err := i.db.UpsertArticleFTS(existingID); err != nil {
+			log.Printf("Warning: failed to update FTS for updated article %d: %v", existingID, err)
 		}
 	}
 
