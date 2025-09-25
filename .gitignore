@@ -5,7 +5,9 @@ test_export/
 
 # Build artifacts
 instapaper-cli
+instapaper-cli-*
 *.exe
+dist/
 
 # OS files
 .DS_Store

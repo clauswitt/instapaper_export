@@ -6,6 +6,7 @@ import (
 	"instapaper-cli/internal/db"
 	"instapaper-cli/internal/export"
 	"instapaper-cli/internal/search"
+	"instapaper-cli/internal/version"
 )
 
 // Server represents the MCP server for Instapaper
@@ -27,7 +28,7 @@ func NewServer(database *db.DB) *Server {
 	// Create MCP server
 	s.mcpServer = server.NewMCPServer(
 		"instapaper",
-		"1.2.1",
+		version.GetMCPVersion(),
 	)
 
 	s.registerTools()

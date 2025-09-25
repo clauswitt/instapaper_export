@@ -15,6 +15,7 @@ import (
 	"instapaper-cli/internal/importer"
 	"instapaper-cli/internal/mcp"
 	"instapaper-cli/internal/search"
+	"instapaper-cli/internal/version"
 
 	"github.com/spf13/cobra"
 )
@@ -227,7 +228,7 @@ func main() {
 		Use:   "version",
 		Short: "Show version information",
 		Run: func(cmd *cobra.Command, args []string) {
-			cmd.Println("instapaper-cli v1.2.1")
+			fmt.Printf("instapaper-cli %s\n", version.GetFullVersion())
 		},
 	}
 
@@ -643,7 +644,7 @@ func runDatabaseDoctor() error {
 }
 
 func runMCP(cmd *cobra.Command, args []string) error {
-	fmt.Fprintf(os.Stderr, "Starting MCP server for instapaper-cli v1.2.1\n")
+	fmt.Fprintf(os.Stderr, "Starting MCP server for instapaper-cli %s\n", version.GetVersion())
 	fmt.Fprintf(os.Stderr, "Database: %s\n", dbPath)
 	fmt.Fprintf(os.Stderr, "MCP server listening on stdio...\n")
 
