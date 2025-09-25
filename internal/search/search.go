@@ -9,6 +9,7 @@ import (
 
 	"instapaper-cli/internal/db"
 	"instapaper-cli/internal/model"
+	"instapaper-cli/internal/util"
 )
 
 type Search struct {
@@ -21,6 +22,8 @@ type SearchOptions struct {
 	UseFTS     bool
 	Limit      int
 	JSONOutput bool
+	Since      string
+	Until      string
 }
 
 func New(database *db.DB) *Search {
@@ -28,16 +31,20 @@ func New(database *db.DB) *Search {
 }
 
 func (s *Search) Search(opts SearchOptions) error {
-	if opts.Query == "" && opts.Field == "" {
-		return fmt.Errorf("search query is required")
+	// Allow empty query for latest articles functionality
+	if opts.Query == "" && opts.Field == "" && opts.Since == "" && opts.Until == "" {
+		return fmt.Errorf("search query or date filter is required")
 	}
 
 	var results []model.SearchResult
 	var err error
 
-	if opts.UseFTS {
+	if opts.UseFTS && opts.Query != "" {
 		results, err = s.searchFTS(opts)
+	} else if opts.Query != "" {
+		results, err = s.searchLike(opts)
 	} else {
+		// Handle case where we only have date filters (for latest command)
 		results, err = s.searchLike(opts)
 	}
 
@@ -76,6 +83,24 @@ func (s *Search) searchLike(opts SearchOptions) ([]model.SearchResult, error) {
 	// Always exclude obsolete articles
 	var conditions []string
 	conditions = append(conditions, "a.obsolete = FALSE")
+
+	// Add date filtering
+	if opts.Since != "" || opts.Until != "" {
+		sinceTime, untilTime, err := util.FormatDateRange(opts.Since, opts.Until)
+		if err != nil {
+			return nil, err
+		}
+
+		if sinceTime != nil {
+			conditions = append(conditions, "a.instapapered_at >= ?")
+			args = append(args, sinceTime.Format("2006-01-02 15:04:05"))
+		}
+
+		if untilTime != nil {
+			conditions = append(conditions, "a.instapapered_at <= ?")
+			args = append(args, untilTime.Format("2006-01-02 15:04:05"))
+		}
+	}
 
 	if opts.Field != "" && opts.Query != "" {
 		switch opts.Field {
@@ -150,6 +175,24 @@ func (s *Search) searchFTS(opts SearchOptions) ([]model.SearchResult, error) {
 	// Always exclude obsolete articles
 	var conditions []string
 	conditions = append(conditions, "a.obsolete = FALSE")
+
+	// Add date filtering
+	if opts.Since != "" || opts.Until != "" {
+		sinceTime, untilTime, err := util.FormatDateRange(opts.Since, opts.Until)
+		if err != nil {
+			return nil, err
+		}
+
+		if sinceTime != nil {
+			conditions = append(conditions, "a.instapapered_at >= ?")
+			args = append(args, sinceTime.Format("2006-01-02 15:04:05"))
+		}
+
+		if untilTime != nil {
+			conditions = append(conditions, "a.instapapered_at <= ?")
+			args = append(args, untilTime.Format("2006-01-02 15:04:05"))
+		}
+	}
 
 	if opts.Field != "" {
 		switch opts.Field {

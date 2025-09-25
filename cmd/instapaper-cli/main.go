@@ -103,12 +103,35 @@ func main() {
 		searchFTS   bool
 		searchLimit int
 		searchJSON  bool
+		searchSince string
+		searchUntil string
 	)
 
 	searchCmd.Flags().StringVar(&searchField, "field", "", "Search specific field: url, title, content, tags, folder")
 	searchCmd.Flags().BoolVar(&searchFTS, "fts", false, "Use full-text search")
 	searchCmd.Flags().IntVar(&searchLimit, "limit", 50, "Maximum number of results")
 	searchCmd.Flags().BoolVar(&searchJSON, "json", false, "Output results as JSON")
+	searchCmd.Flags().StringVar(&searchSince, "since", "", "Filter articles since date (1d, 1w, today, yesterday, 2006-01-02)")
+	searchCmd.Flags().StringVar(&searchUntil, "until", "", "Filter articles until date (1d, 1w, today, yesterday, 2006-01-02)")
+
+	var latestCmd = &cobra.Command{
+		Use:   "latest",
+		Short: "Get latest articles with optional date filtering",
+		Long:  "Retrieve the most recent articles, optionally filtered by date range. Useful for finding articles added within specific timeframes.",
+		RunE:  runLatest,
+	}
+
+	var (
+		latestLimit int
+		latestJSON  bool
+		latestSince string
+		latestUntil string
+	)
+
+	latestCmd.Flags().IntVar(&latestLimit, "limit", 20, "Maximum number of articles to show")
+	latestCmd.Flags().BoolVar(&latestJSON, "json", false, "Output results as JSON")
+	latestCmd.Flags().StringVar(&latestSince, "since", "", "Show articles since date (1d, 1w, today, yesterday, 2006-01-02)")
+	latestCmd.Flags().StringVar(&latestUntil, "until", "", "Show articles until date (1d, 1w, today, yesterday, 2006-01-02)")
 
 	var exportCmd = &cobra.Command{
 		Use:   "export",
@@ -261,7 +284,7 @@ func main() {
 	var statsJSON bool
 	statsCmd.Flags().BoolVar(&statsJSON, "json", false, "Output statistics as JSON")
 
-	rootCmd.AddCommand(importCmd, fetchCmd, searchCmd, exportCmd, exportAllCmd, foldersCmd, tagsCmd, doctorCmd, versionCmd, mcpCmd, obsoleteCmd, listObsoleteCmd, statsCmd)
+	rootCmd.AddCommand(importCmd, fetchCmd, searchCmd, latestCmd, exportCmd, exportAllCmd, foldersCmd, tagsCmd, doctorCmd, versionCmd, mcpCmd, obsoleteCmd, listObsoleteCmd, statsCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
@@ -315,6 +338,8 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	useFTS, _ := cmd.Flags().GetBool("fts")
 	limit, _ := cmd.Flags().GetInt("limit")
 	jsonOutput, _ := cmd.Flags().GetBool("json")
+	since, _ := cmd.Flags().GetString("since")
+	until, _ := cmd.Flags().GetString("until")
 
 	opts := search.SearchOptions{
 		Query:      query,
@@ -322,6 +347,29 @@ func runSearch(cmd *cobra.Command, args []string) error {
 		UseFTS:     useFTS,
 		Limit:      limit,
 		JSONOutput: jsonOutput,
+		Since:      since,
+		Until:      until,
+	}
+
+	s := search.New(database)
+	return s.Search(opts)
+}
+
+func runLatest(cmd *cobra.Command, args []string) error {
+	limit, _ := cmd.Flags().GetInt("limit")
+	jsonOutput, _ := cmd.Flags().GetBool("json")
+	since, _ := cmd.Flags().GetString("since")
+	until, _ := cmd.Flags().GetString("until")
+
+	// Use search functionality with empty query to get all articles
+	opts := search.SearchOptions{
+		Query:      "",
+		Field:      "",
+		UseFTS:     false,
+		Limit:      limit,
+		JSONOutput: jsonOutput,
+		Since:      since,
+		Until:      until,
 	}
 
 	s := search.New(database)

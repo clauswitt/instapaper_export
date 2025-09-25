@@ -76,9 +76,42 @@ instapaper-cli search --title "docker"
 instapaper-cli search --folder "tech"
 instapaper-cli search --tag "ai"
 
+# Search with date filtering
+instapaper-cli search "kubernetes" --since "1w"
+instapaper-cli search "ai" --since "today"
+instapaper-cli search "golang" --since "2024-01-01" --until "2024-06-01"
+
 # Output as JSON
 instapaper-cli search "golang" --json
 ```
+
+### Latest Articles
+Get the most recent articles with optional date filtering:
+```bash
+# Get latest 20 articles
+instapaper-cli latest
+
+# Get articles from last week
+instapaper-cli latest --since "1w"
+
+# Get articles from today
+instapaper-cli latest --since "today" --limit 10
+
+# Get articles from specific date range
+instapaper-cli latest --since "2024-01-01" --until "2024-01-31"
+
+# Output as JSON
+instapaper-cli latest --json
+```
+
+**Date Filter Examples:**
+- `today` - Articles from today
+- `yesterday` - Articles from yesterday
+- `1d` - Articles from last 1 day
+- `1w` - Articles from last 1 week
+- `1m` - Articles from last 1 month
+- `2024-01-15` - Articles from specific date
+- `2024-01-15T10:00:00Z` - Articles from specific datetime
 
 ### Export
 Export individual articles or entire collection:
@@ -104,11 +137,13 @@ instapaper-cli mcp --db /path/to/instapaper.sqlite
 ```
 
 **Available MCP Tools:**
-- `search_articles` - Search with filters, full-text search, date ranges
+- `search_articles` - Search with filters, full-text search, date ranges (supports "kubernetes" + since="1w")
 - `get_article` - Get single article with full content by ID
+- `get_latest_articles` - Get recent articles with date filtering (1d, 1w, today, etc.)
 - `list_folders` - Browse available folders with article counts
 - `list_tags` - Browse available tags with article counts
 - `export_articles` - Export filtered articles to markdown for AI consumption
+- `get_usage_examples` - Get examples of how to handle common user requests
 
 **Claude Desktop Integration:**
 ```json

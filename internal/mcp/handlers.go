@@ -15,6 +15,8 @@ func (s *Server) handleSearchArticles(arguments map[string]interface{}) (*mcp.Ca
 	// Extract parameters with defaults
 	query, _ := arguments["query"].(string)
 	field, _ := arguments["field"].(string)
+	since, _ := arguments["since"].(string)
+	until, _ := arguments["until"].(string)
 
 	// Default to FTS for better search experience and intersection queries
 	useFTS := true
@@ -37,6 +39,8 @@ func (s *Server) handleSearchArticles(arguments map[string]interface{}) (*mcp.Ca
 		UseFTS:     useFTS,
 		Limit:      limit,
 		JSONOutput: false,
+		Since:      since,
+		Until:      until,
 	}
 
 	// Perform basic search using existing functionality
@@ -47,8 +51,11 @@ func (s *Server) handleSearchArticles(arguments map[string]interface{}) (*mcp.Ca
 		results, err = s.searchFTS(searchOpts)
 	} else if query != "" {
 		results, err = s.searchLike(searchOpts)
+	} else if since != "" || until != "" {
+		// Handle date-only filtering (like latest command)
+		results, err = s.searchLike(searchOpts)
 	} else {
-		// Return empty results if no query
+		// Return empty results if no query or date filter
 		results = []model.SearchResult{}
 	}
 
@@ -368,4 +375,181 @@ func (s *Server) handleExportArticles(arguments map[string]interface{}) (*mcp.Ca
 	}
 
 	return mcp.NewToolResultText(content.String()), nil
+}
+
+// handleGetLatestArticles handles the get_latest_articles tool
+func (s *Server) handleGetLatestArticles(arguments map[string]interface{}) (*mcp.CallToolResult, error) {
+	limit := 20
+	if l, ok := arguments["limit"].(float64); ok {
+		limit = int(l)
+	}
+
+	since, _ := arguments["since"].(string)
+	until, _ := arguments["until"].(string)
+	onlySynced, _ := arguments["only_synced"].(bool)
+
+	// Use search functionality with empty query to get latest articles
+	searchOpts := search.SearchOptions{
+		Query:      "",
+		Field:      "",
+		UseFTS:     false,
+		Limit:      limit,
+		JSONOutput: false,
+		Since:      since,
+		Until:      until,
+	}
+
+	// Get results using search
+	results, err := s.searchLike(searchOpts)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to get latest articles: %v", err)), nil
+	}
+
+	// Filter by synced status if requested
+	if onlySynced {
+		var filteredResults []model.SearchResult
+		for _, result := range results {
+			if result.SyncedAt != nil {
+				filteredResults = append(filteredResults, result)
+			}
+		}
+		results = filteredResults
+	}
+
+	// Format results
+	if len(results) == 0 {
+		return mcp.NewToolResultText("No articles found matching the criteria."), nil
+	}
+
+	var output strings.Builder
+
+	// Add context about date filtering
+	if since != "" || until != "" {
+		output.WriteString("Latest articles")
+		if since != "" && until != "" {
+			output.WriteString(fmt.Sprintf(" from %s to %s", since, until))
+		} else if since != "" {
+			output.WriteString(fmt.Sprintf(" since %s", since))
+		} else if until != "" {
+			output.WriteString(fmt.Sprintf(" until %s", until))
+		}
+		output.WriteString(fmt.Sprintf(" (%d articles):\n\n", len(results)))
+	} else {
+		output.WriteString(fmt.Sprintf("Latest %d articles:\n\n", len(results)))
+	}
+
+	for i, result := range results {
+		output.WriteString(fmt.Sprintf("**%d. %s**\n", i+1, result.Title))
+		output.WriteString(fmt.Sprintf("ID: %d\n", result.ID))
+		output.WriteString(fmt.Sprintf("URL: %s\n", result.URL))
+
+		// Parse and format the date nicely
+		if parsedTime, err := time.Parse(time.RFC3339, result.InstapaperedAt); err == nil {
+			output.WriteString(fmt.Sprintf("Added: %s\n", parsedTime.Format("2006-01-02 15:04:05")))
+		}
+
+		if result.FolderPath != nil && *result.FolderPath != "" {
+			output.WriteString(fmt.Sprintf("Folder: %s\n", *result.FolderPath))
+		}
+
+		if result.Tags != nil && *result.Tags != "" {
+			output.WriteString(fmt.Sprintf("Tags: %s\n", *result.Tags))
+		}
+
+		if result.SyncedAt != nil {
+			output.WriteString("Content: Available\n")
+		} else {
+			output.WriteString("Content: Not downloaded\n")
+		}
+
+		output.WriteString("\n")
+	}
+
+	return mcp.NewToolResultText(output.String()), nil
+}
+
+// handleGetUsageExamples provides examples of how to handle common requests
+func (s *Server) handleGetUsageExamples(arguments map[string]interface{}) (*mcp.CallToolResult, error) {
+	examples := `# Common Request Patterns and Tool Usage
+
+## Search with Time Filters
+
+**User Request: "Give me all the Kubernetes articles from the last week"**
+Tool: search_articles
+Parameters:
+- query: "kubernetes"
+- since: "1w"
+
+**User Request: "Show me AI articles from today"**
+Tool: search_articles
+Parameters:
+- query: "AI"
+- since: "today"
+
+**User Request: "Find Docker articles from last month"**
+Tool: search_articles
+Parameters:
+- query: "docker"
+- since: "1m"
+
+**User Request: "Python articles from January 2024"**
+Tool: search_articles
+Parameters:
+- query: "python"
+- since: "2024-01-01"
+- until: "2024-01-31"
+
+## Recent Articles Without Search
+
+**User Request: "What did I save recently?" / "Show me my recent articles"**
+Tool: get_latest_articles
+Parameters:
+- limit: 10
+
+**User Request: "What did I save last week?"**
+Tool: get_latest_articles
+Parameters:
+- since: "1w"
+- limit: 20
+
+**User Request: "Show me articles I saved today"**
+Tool: get_latest_articles
+Parameters:
+- since: "today"
+
+## Date Filter Values
+
+Common date filters to use:
+- "today" - Articles from today
+- "yesterday" - Articles from yesterday
+- "1d" - Last 1 day
+- "3d" - Last 3 days
+- "1w" - Last 1 week
+- "2w" - Last 2 weeks
+- "1m" - Last 1 month
+- "3m" - Last 3 months
+- "1y" - Last 1 year
+- "2024-01-15" - Specific date
+- "2024-01-01" to "2024-01-31" - Date range (use both since and until)
+
+## Search vs Latest Articles
+
+- Use **search_articles** when user mentions specific topics/keywords + time
+- Use **get_latest_articles** when user just wants recent articles by time without topics
+
+## Content vs Metadata
+
+- Most searches return metadata (title, URL, date, tags)
+- Use **get_article** with specific ID to get full article content
+- Set only_synced=true to only return articles with downloaded content
+
+## Examples in Context
+
+"Show me recent articles about machine learning" → search_articles(query="machine learning", since="1w")
+"What have I saved in the past few days?" → get_latest_articles(since="3d")
+"Find all React articles from last month" → search_articles(query="react", since="1m")
+"Get me the latest 5 articles" → get_latest_articles(limit=5)
+"Show me Node.js articles from this year" → search_articles(query="node.js", since="1y")`
+
+	return mcp.NewToolResultText(examples), nil
 }

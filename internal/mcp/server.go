@@ -44,13 +44,13 @@ func (s *Server) registerTools() {
 	// Search articles tool
 	s.mcpServer.AddTool(mcp.Tool{
 		Name:        "search_articles",
-		Description: "Search articles with various filters including full-text search (default), date ranges, tags, and folders. Multiple keywords in query are treated as intersection (AND).",
+		Description: "Search articles with various filters including full-text search (default), date ranges, tags, and folders. Multiple keywords in query are treated as intersection (AND). For requests like 'kubernetes articles from last week' use query='kubernetes' and since='1w'. For 'AI articles from today' use query='AI' and since='today'.",
 		InputSchema: mcp.ToolInputSchema{
 			Type: "object",
 			Properties: map[string]interface{}{
 				"query": map[string]interface{}{
 					"type":        "string",
-					"description": "Search query text. Multiple keywords will be treated as AND (intersection). Use full-text search for better results.",
+					"description": "Search query text. Multiple keywords will be treated as AND (intersection). Use full-text search for better results. Examples: 'kubernetes', 'machine learning', 'docker containers'.",
 				},
 				"field": map[string]interface{}{
 					"type":        "string",
@@ -79,13 +79,21 @@ func (s *Server) registerTools() {
 						"type": "string",
 					},
 				},
+				"since": map[string]interface{}{
+					"type":        "string",
+					"description": "Filter articles since date. Common values: '1d' (last day), '1w' (last week), '1m' (last month), 'today', 'yesterday'. Also supports absolute dates like '2024-01-15' or ISO 8601 format.",
+				},
+				"until": map[string]interface{}{
+					"type":        "string",
+					"description": "Filter articles until date. Common values: 'today', 'yesterday', '2024-01-15'. Used with 'since' to create date ranges.",
+				},
 				"date_after": map[string]interface{}{
 					"type":        "string",
-					"description": "Only include articles added after this date (ISO 8601 format)",
+					"description": "Legacy: Only include articles added after this date (ISO 8601 format) - use 'since' instead",
 				},
 				"date_before": map[string]interface{}{
 					"type":        "string",
-					"description": "Only include articles added before this date (ISO 8601 format)",
+					"description": "Legacy: Only include articles added before this date (ISO 8601 format) - use 'until' instead",
 				},
 				"only_synced": map[string]interface{}{
 					"type":        "boolean",
@@ -177,4 +185,41 @@ func (s *Server) registerTools() {
 			},
 		},
 	}, s.handleExportArticles)
+
+	// Get latest articles tool
+	s.mcpServer.AddTool(mcp.Tool{
+		Name:        "get_latest_articles",
+		Description: "Get the most recent articles with optional date filtering. Perfect for requests like 'show me recent articles', 'what did I save last week', or 'articles from today'. Use this when no search query is needed, just recent articles by date.",
+		InputSchema: mcp.ToolInputSchema{
+			Type: "object",
+			Properties: map[string]interface{}{
+				"limit": map[string]interface{}{
+					"type":        "integer",
+					"description": "Maximum number of articles to return (default: 20)",
+				},
+				"since": map[string]interface{}{
+					"type":        "string",
+					"description": "Show articles since date. Examples: '1w' for last week, '1d' for yesterday, 'today', '3d' for last 3 days, '1m' for last month.",
+				},
+				"until": map[string]interface{}{
+					"type":        "string",
+					"description": "Show articles until date. Examples: 'today', 'yesterday'. Combine with 'since' for date ranges.",
+				},
+				"only_synced": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Only return articles that have content downloaded (default: false)",
+				},
+			},
+		},
+	}, s.handleGetLatestArticles)
+
+	// Usage examples tool
+	s.mcpServer.AddTool(mcp.Tool{
+		Name:        "get_usage_examples",
+		Description: "Get examples of how to handle common user requests using the available tools. Use this to understand how to translate natural language requests into proper tool calls.",
+		InputSchema: mcp.ToolInputSchema{
+			Type:       "object",
+			Properties: map[string]interface{}{},
+		},
+	}, s.handleGetUsageExamples)
 }
