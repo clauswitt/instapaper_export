@@ -227,7 +227,7 @@ func main() {
 		Use:   "version",
 		Short: "Show version information",
 		Run: func(cmd *cobra.Command, args []string) {
-			cmd.Println("instapaper-cli v1.2.0")
+			cmd.Println("instapaper-cli v1.2.1")
 		},
 	}
 
@@ -643,7 +643,7 @@ func runDatabaseDoctor() error {
 }
 
 func runMCP(cmd *cobra.Command, args []string) error {
-	fmt.Fprintf(os.Stderr, "Starting MCP server for instapaper-cli v1.2.0\n")
+	fmt.Fprintf(os.Stderr, "Starting MCP server for instapaper-cli v1.2.1\n")
 	fmt.Fprintf(os.Stderr, "Database: %s\n", dbPath)
 	fmt.Fprintf(os.Stderr, "MCP server listening on stdio...\n")
 
