@@ -27,7 +27,7 @@ func NewServer(database *db.DB) *Server {
 	// Create MCP server
 	s.mcpServer = server.NewMCPServer(
 		"instapaper",
-		"1.0.0",
+		"1.2.0",
 	)
 
 	s.registerTools()
