@@ -124,6 +124,9 @@ instapaper-cli export-all --dir ~/knowledge-base
 
 # Preserve folder structure
 instapaper-cli export-all --dir ~/kb --preserve-folders
+
+# Export search results directly
+instapaper-cli export-all --dir ~/exports --from-search "kubernetes"
 ```
 
 ### MCP Server
@@ -169,8 +172,22 @@ instapaper-cli tags
 # Database health check
 instapaper-cli doctor
 
+# Show database statistics
+instapaper-cli stats
+
 # Show version
 instapaper-cli version
+
+# Mark articles as obsolete (exclude from searches/exports)
+instapaper-cli obsolete --status-codes 404,403 --confirm
+instapaper-cli obsolete --min-failures 3 --confirm
+instapaper-cli obsolete --ids 123,456 --confirm
+
+# List obsolete articles
+instapaper-cli list-obsolete
+
+# Preview what would be marked obsolete (dry run)
+instapaper-cli obsolete --status-codes 404 --dry-run
 ```
 
 ## Architecture
