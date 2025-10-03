@@ -5,7 +5,8 @@ A full-featured Go CLI application that transforms Instapaper CSV exports into a
 ## Features
 
 - **Import**: Parse Instapaper CSV exports into SQLite database with proper normalization
-- **Fetch**: Download article content using readability extraction
+- **RSS Feeds**: Subscribe to and sync Instapaper RSS feeds with tag inheritance
+- **Fetch**: Download article content using readability extraction with smart retry logic
 - **Search**: Full-text and LIKE search across titles, URLs, content, folders, and tags
 - **Export**: Generate Markdown files with YAML frontmatter for knowledge management
 - **MCP Server**: Model Context Protocol server for AI integration (Claude, etc.)
@@ -31,16 +32,20 @@ go build -o instapaper-cli cmd/instapaper-cli/main.go
 # 1. Import your Instapaper CSV export
 instapaper-cli import --csv export.csv
 
-# 2. Fetch article content (optional but recommended)
+# 2. Or subscribe to your Instapaper RSS feed
+instapaper-cli rss:add https://www.instapaper.com/rss/YOUR_FEED_ID --tags "instapaper,reading"
+instapaper-cli rss
+
+# 3. Fetch article content (optional but recommended)
 instapaper-cli fetch --limit 50
 
-# 3. Search your articles
+# 4. Search your articles
 instapaper-cli search "kubernetes"
 
-# 4. Export to markdown files
+# 5. Export to markdown files
 instapaper-cli export-all --dir ~/knowledge-base
 
-# 5. Start MCP server for AI integration
+# 6. Start MCP server for AI integration
 instapaper-cli mcp
 ```
 
@@ -52,18 +57,54 @@ Import articles from Instapaper CSV export:
 instapaper-cli import --csv path/to/export.csv
 ```
 
+### RSS Feeds
+Manage and sync Instapaper RSS feeds:
+```bash
+# Add a new RSS feed (with optional tags)
+instapaper-cli rss:add https://www.instapaper.com/rss/YOUR_FEED_ID
+instapaper-cli rss:add https://www.instapaper.com/rss/YOUR_FEED_ID --name "My Reading List" --tags "tech,articles"
+
+# List all RSS feeds
+instapaper-cli rss:list
+instapaper-cli rss:list --json
+
+# Sync all active RSS feeds
+instapaper-cli rss
+
+# Update a feed's name or tags
+instapaper-cli rss:update --id 1 --name "New Name"
+instapaper-cli rss:update --id 1 --tags "new,tags"
+
+# Delete a feed (articles remain in database)
+instapaper-cli rss:delete --id 1
+```
+
+**Features:**
+- Automatic duplicate prevention (URL-based)
+- URL normalization (http→https) to avoid duplicates
+- Tag inheritance: all articles from a feed get the feed's tags
+- Feed-level tag management without affecting existing articles
+
 ### Fetch
 Download article content with readability extraction:
 ```bash
 # Fetch all unfetched articles
 instapaper-cli fetch
 
-# Fetch with limit and rate limiting
-instapaper-cli fetch --limit 100 --delay 1s
+# Fetch with limit
+instapaper-cli fetch --limit 100
 
-# Retry failed fetches
-instapaper-cli fetch --retry-failed
+# Fetch oldest articles first (default)
+instapaper-cli fetch --order oldest --limit 50
+
+# Fetch newest articles first
+instapaper-cli fetch --order newest --limit 50
 ```
+
+**Smart Retry Logic:**
+- Articles that fail are automatically retried after 1 hour
+- Maximum 5 retry attempts before permanent exclusion
+- Failed articles can be marked as obsolete to exclude them completely
 
 ### Search
 Search through your articles:
@@ -193,11 +234,13 @@ instapaper-cli obsolete --status-codes 404 --dry-run
 ## Architecture
 
 - **SQLite backend** with migration system and FTS5 full-text search
+- **Foreign key constraints** properly enabled for referential integrity
 - **Cobra CLI** framework with subcommands
+- **RSS feed management** with CRUD operations and tag inheritance
 - **Readability extraction** for clean article content using go-shiori/go-readability
 - **HTML-to-Markdown** conversion with cleanup
-- **URL canonicalization** and duplicate handling
-- **Retry logic** with exponential backoff for failed fetches
+- **URL normalization** (http→https) and duplicate prevention
+- **Smart retry logic** with 1-hour cooldown and 5-attempt maximum
 
 ## Tech Stack
 
