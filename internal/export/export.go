@@ -319,8 +319,8 @@ func (e *Export) exportSingleArticle(article model.ArticleWithDetails, baseDir s
 	}
 
 	folderPath := baseDir
-	if article.FolderPath != "" {
-		folderPath = filepath.Join(baseDir, article.FolderPath)
+	if article.FolderPath != nil && *article.FolderPath != "" {
+		folderPath = filepath.Join(baseDir, *article.FolderPath)
 		if err := os.MkdirAll(folderPath, 0755); err != nil {
 			return fmt.Errorf("failed to create folder: %w", err)
 		}

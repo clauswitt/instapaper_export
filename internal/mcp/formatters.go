@@ -86,8 +86,8 @@ func (s *Server) convertArticleWithDetailsToResponse(article model.ArticleWithDe
 		response.Tags = article.Tags
 	}
 
-	if article.FolderPath != "" {
-		response.FolderPath = &article.FolderPath
+	if article.FolderPath != nil && *article.FolderPath != "" {
+		response.FolderPath = article.FolderPath
 	}
 
 	return response

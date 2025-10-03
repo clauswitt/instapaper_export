@@ -138,8 +138,8 @@ func (s *Server) handleGetArticle(arguments map[string]interface{}) (*mcp.CallTo
 	output.WriteString(fmt.Sprintf("**ID:** %d\n", article.ID))
 	output.WriteString(fmt.Sprintf("**URL:** %s\n", article.URL))
 
-	if article.FolderPath != "" {
-		output.WriteString(fmt.Sprintf("**Folder:** %s\n", article.FolderPath))
+	if article.FolderPath != nil && *article.FolderPath != "" {
+		output.WriteString(fmt.Sprintf("**Folder:** %s\n", *article.FolderPath))
 	}
 
 	if includeTags && len(article.Tags) > 0 {
@@ -354,8 +354,8 @@ func (s *Server) handleExportArticles(arguments map[string]interface{}) (*mcp.Ca
 		content.WriteString(fmt.Sprintf("## %s\n\n", article.Title))
 		content.WriteString(fmt.Sprintf("**Source:** %s\n", article.URL))
 
-		if article.FolderPath != "" {
-			content.WriteString(fmt.Sprintf("**Folder:** %s\n", article.FolderPath))
+		if article.FolderPath != nil && *article.FolderPath != "" {
+			content.WriteString(fmt.Sprintf("**Folder:** %s\n", *article.FolderPath))
 		}
 
 		if len(article.Tags) > 0 {

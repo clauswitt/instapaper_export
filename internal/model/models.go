@@ -40,7 +40,7 @@ type ArticleTag struct {
 
 type ArticleWithDetails struct {
 	Article
-	FolderPath string   `db:"folder_path" json:"folder_path,omitempty"`
+	FolderPath *string  `db:"folder_path" json:"folder_path,omitempty"`
 	Tags       []string `json:"tags,omitempty"`
 }
 
