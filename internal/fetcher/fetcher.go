@@ -83,7 +83,8 @@ func (f *Fetcher) getCandidateArticles(opts FetchOptions) ([]model.Article, erro
 		SELECT id, url, title, instapapered_at
 		FROM articles
 		WHERE synced_at IS NULL
-		AND (failed_count < 5 OR sync_failed_at <= datetime('now', '-1 hour'))
+		AND failed_count < 5
+		AND (sync_failed_at IS NULL OR sync_failed_at <= datetime('now', '-1 hour'))
 		AND obsolete = FALSE
 	`
 

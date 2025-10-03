@@ -72,3 +72,22 @@ type SearchResult struct {
 	StatusCode     *int    `db:"status_code" json:"status_code,omitempty"`
 	InstapaperedAt string  `db:"instapapered_at" json:"instapapered_at"`
 }
+
+type RSSFeed struct {
+	ID           int64   `db:"id" json:"id"`
+	URL          string  `db:"url" json:"url"`
+	Name         string  `db:"name" json:"name"`
+	CreatedAt    string  `db:"created_at" json:"created_at"`
+	LastSyncedAt *string `db:"last_synced_at" json:"last_synced_at,omitempty"`
+	Active       bool    `db:"active" json:"active"`
+}
+
+type RSSFeedWithTags struct {
+	RSSFeed
+	Tags []string `json:"tags,omitempty"`
+}
+
+type RSSFeedTag struct {
+	FeedID int64 `db:"feed_id" json:"feed_id"`
+	TagID  int64 `db:"tag_id" json:"tag_id"`
+}

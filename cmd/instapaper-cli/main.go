@@ -14,6 +14,8 @@ import (
 	"instapaper-cli/internal/fetcher"
 	"instapaper-cli/internal/importer"
 	"instapaper-cli/internal/mcp"
+	"instapaper-cli/internal/model"
+	"instapaper-cli/internal/rss"
 	"instapaper-cli/internal/search"
 	"instapaper-cli/internal/version"
 
@@ -285,7 +287,66 @@ func main() {
 	var statsJSON bool
 	statsCmd.Flags().BoolVar(&statsJSON, "json", false, "Output statistics as JSON")
 
-	rootCmd.AddCommand(importCmd, fetchCmd, searchCmd, latestCmd, exportCmd, exportAllCmd, foldersCmd, tagsCmd, doctorCmd, versionCmd, mcpCmd, obsoleteCmd, listObsoleteCmd, statsCmd)
+	// RSS commands
+	var rssCmd = &cobra.Command{
+		Use:   "rss",
+		Short: "Sync all RSS feeds",
+		Long:  "Synchronize articles from all active RSS feeds. Use rss:add, rss:list, rss:delete, rss:update for feed management.",
+		RunE:  runRSSSync,
+	}
+
+	var rssAddCmd = &cobra.Command{
+		Use:   "rss:add [url]",
+		Short: "Add a new RSS feed",
+		Args:  cobra.ExactArgs(1),
+		RunE:  runRSSAdd,
+	}
+
+	var (
+		rssAddName string
+		rssAddTags string
+	)
+
+	rssAddCmd.Flags().StringVar(&rssAddName, "name", "instapaper", "Feed name")
+	rssAddCmd.Flags().StringVar(&rssAddTags, "tags", "", "Comma-separated tags to apply to all articles from this feed")
+
+	var rssListCmd = &cobra.Command{
+		Use:   "rss:list",
+		Short: "List all RSS feeds",
+		RunE:  runRSSList,
+	}
+
+	var rssListJSON bool
+	rssListCmd.Flags().BoolVar(&rssListJSON, "json", false, "Output results as JSON")
+
+	var rssDeleteCmd = &cobra.Command{
+		Use:   "rss:delete",
+		Short: "Delete an RSS feed",
+		RunE:  runRSSDelete,
+	}
+
+	var rssDeleteID int64
+	rssDeleteCmd.Flags().Int64Var(&rssDeleteID, "id", 0, "Feed ID to delete (required)")
+	rssDeleteCmd.MarkFlagRequired("id")
+
+	var rssUpdateCmd = &cobra.Command{
+		Use:   "rss:update",
+		Short: "Update an RSS feed",
+		RunE:  runRSSUpdate,
+	}
+
+	var (
+		rssUpdateID   int64
+		rssUpdateName string
+		rssUpdateTags string
+	)
+
+	rssUpdateCmd.Flags().Int64Var(&rssUpdateID, "id", 0, "Feed ID to update (required)")
+	rssUpdateCmd.Flags().StringVar(&rssUpdateName, "name", "", "New feed name")
+	rssUpdateCmd.Flags().StringVar(&rssUpdateTags, "tags", "", "Comma-separated tags (replaces existing tags)")
+	rssUpdateCmd.MarkFlagRequired("id")
+
+	rootCmd.AddCommand(importCmd, fetchCmd, searchCmd, latestCmd, exportCmd, exportAllCmd, foldersCmd, tagsCmd, doctorCmd, versionCmd, mcpCmd, obsoleteCmd, listObsoleteCmd, statsCmd, rssCmd, rssAddCmd, rssListCmd, rssDeleteCmd, rssUpdateCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
@@ -1033,4 +1094,168 @@ func runStats(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func runRSSAdd(cmd *cobra.Command, args []string) error {
+	url := args[0]
+	name, _ := cmd.Flags().GetString("name")
+	tagsStr, _ := cmd.Flags().GetString("tags")
+
+	var tags []string
+	if tagsStr != "" {
+		tags = strings.Split(tagsStr, ",")
+		for i := range tags {
+			tags[i] = strings.TrimSpace(tags[i])
+		}
+	}
+
+	feedID, err := database.AddRSSFeed(url, name, tags)
+	if err != nil {
+		return fmt.Errorf("failed to add RSS feed: %w", err)
+	}
+
+	fmt.Printf("Added RSS feed #%d: %s\n", feedID, name)
+	if len(tags) > 0 {
+		fmt.Printf("Tags: %s\n", strings.Join(tags, ", "))
+	}
+
+	return nil
+}
+
+func runRSSList(cmd *cobra.Command, args []string) error {
+	jsonOutput, _ := cmd.Flags().GetBool("json")
+
+	feeds, err := database.GetRSSFeeds()
+	if err != nil {
+		return fmt.Errorf("failed to get RSS feeds: %w", err)
+	}
+
+	if len(feeds) == 0 {
+		fmt.Println("No RSS feeds configured.")
+		return nil
+	}
+
+	if jsonOutput {
+		encoder := json.NewEncoder(os.Stdout)
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(feeds)
+	}
+
+	fmt.Printf("%-5s %-30s %-50s %-20s %s\n", "ID", "NAME", "URL", "LAST SYNCED", "TAGS")
+	fmt.Println(strings.Repeat("-", 130))
+
+	for _, feed := range feeds {
+		lastSynced := "never"
+		if syncedAt, ok := feed["last_synced_at"].(string); ok && syncedAt != "" {
+			lastSynced = syncedAt
+		}
+
+		tags := ""
+		if tagStr, ok := feed["tags"].(string); ok && tagStr != "" {
+			tags = tagStr
+		}
+
+		fmt.Printf("%-5d %-30s %-50s %-20s %s\n",
+			feed["id"],
+			feed["name"],
+			truncate(feed["url"].(string), 50),
+			truncate(lastSynced, 20),
+			tags,
+		)
+	}
+
+	return nil
+}
+
+func runRSSDelete(cmd *cobra.Command, args []string) error {
+	id, _ := cmd.Flags().GetInt64("id")
+
+	if err := database.DeleteRSSFeed(id); err != nil {
+		return fmt.Errorf("failed to delete RSS feed: %w", err)
+	}
+
+	fmt.Printf("Deleted RSS feed #%d\n", id)
+	return nil
+}
+
+func runRSSUpdate(cmd *cobra.Command, args []string) error {
+	id, _ := cmd.Flags().GetInt64("id")
+	name, _ := cmd.Flags().GetString("name")
+	tagsStr, _ := cmd.Flags().GetString("tags")
+
+	var namePtr *string
+	if name != "" {
+		namePtr = &name
+	}
+
+	var tags []string
+	if tagsStr != "" {
+		tags = strings.Split(tagsStr, ",")
+		for i := range tags {
+			tags[i] = strings.TrimSpace(tags[i])
+		}
+	}
+
+	if err := database.UpdateRSSFeed(id, namePtr, tags); err != nil {
+		return fmt.Errorf("failed to update RSS feed: %w", err)
+	}
+
+	fmt.Printf("Updated RSS feed #%d\n", id)
+	return nil
+}
+
+func runRSSSync(cmd *cobra.Command, args []string) error {
+	feeds, err := database.GetRSSFeeds()
+	if err != nil {
+		return fmt.Errorf("failed to get RSS feeds: %w", err)
+	}
+
+	if len(feeds) == 0 {
+		fmt.Println("No RSS feeds configured. Use 'rss:add' to add a feed.")
+		return nil
+	}
+
+	totalNew := 0
+
+	for _, feedData := range feeds {
+		// Skip inactive feeds
+		if active, ok := feedData["active"].(bool); ok && !active {
+			continue
+		}
+
+		// Get feed details with tags
+		feedID := feedData["id"].(int64)
+		_, tags, err := database.GetRSSFeed(feedID)
+		if err != nil {
+			fmt.Printf("Error getting feed #%d: %v\n", feedID, err)
+			continue
+		}
+
+		feed := &model.RSSFeed{
+			ID:   feedID,
+			URL:  feedData["url"].(string),
+			Name: feedData["name"].(string),
+		}
+
+		fmt.Printf("Syncing: %s...\n", feed.Name)
+
+		newArticles, err := rss.SyncFeed(database, feed, tags)
+		if err != nil {
+			fmt.Printf("  Error: %v\n", err)
+			continue
+		}
+
+		fmt.Printf("  Added %d new articles\n", newArticles)
+		totalNew += newArticles
+	}
+
+	fmt.Printf("\nSync complete. Total new articles: %d\n", totalNew)
+	return nil
+}
+
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen-3] + "..."
 }
